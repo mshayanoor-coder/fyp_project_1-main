@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreelanceIQ - House Expense Tracker</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="brand" href="home.html">Freelance<span>IQ</span></a>
+      <div class="nav-links">
+        <a class="tab" href="home.html">Home</a>
+        <a class="tab" href="calculator.html">Calculators</a>
+        <a class="tab active" href="expense.html">Expenses</a>
+        <a class="tab" href="dashboard.html">Dashboard</a>
+        <a class="tab" href="invoice.html">Invoice</a>
+        <a class="tab" href="compare.html">Compare</a>
+      </div>
+    </div>
+
+    <div class="currency-nav-wrap no-print">
+      <span class="currency-label">CURRENCY:</span>
+      <select id="globalCurrencySelect">
+        <option value="USD">USD ($)</option>
+        <option value="PKR">PKR (₨)</option>
+        <option value="GBP">GBP (£)</option>
+        <option value="EUR">EUR (€)</option>
+        <option value="AED">AED (د.إ)</option>
+      </select>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <div class="page-title">House Expense Tracker</div>
+    <div class="page-sub">Enter your monthly household expenses</div>
+
+    <div class="grid-2">
+      <!-- Housing Card -->
+      <div class="card">
+        <div class="card-title">🏠 Housing</div>
+        <div class="exp-row"><span class="exp-label">Rent / Mortgage</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Electricity</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Gas / Water</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Internet</span><input type="number" class="exp-input" placeholder="0"></div>
+      </div>
+      
+      <!-- Daily Life Card -->
+      <div class="card">
+        <div class="card-title">🛒 Daily Life</div>
+        <div class="exp-row"><span class="exp-label">Groceries</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Transport</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Clothing</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Phone Bill</span><input type="number" class="exp-input" placeholder="0"></div>
+      </div>
+      
+      <!-- Health & Education Card -->
+      <div class="card">
+        <div class="card-title">🏥 Health &amp; Education</div>
+        <div class="exp-row"><span class="exp-label">Health / Medical</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Education</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Family Expenses</span><input type="number" class="exp-input" placeholder="0"></div>
+      </div>
+      
+      <!-- Savings & Other Card -->
+      <div class="card">
+        <div class="card-title">💰 Savings &amp; Other</div>
+        <div class="exp-row"><span class="exp-label">Monthly Savings</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Entertainment</span><input type="number" class="exp-input" placeholder="0"></div>
+        <div class="exp-row"><span class="exp-label">Other / Misc</span><input type="number" class="exp-input" placeholder="0"></div>
+      </div>
+    </div>
+    
+    <div id="exp-result" class="result-box" style="margin-top: 16px;">
+      <div class="result-row">
+        <span class="lbl">Total Monthly House Expenses</span>
+        <span id="exp-total" style="color:#D85A30; font-size:20px; font-weight:700;">—</span>
+      </div>
+      <div style="font-size:12px; color:#888; margin-top:8px;">✓ Automatically synchronized with your shared dashboard variables.</div>
+    </div>
+  </div>
+
+  <script src="../javascript/expense.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dropdown = document.getElementById("globalCurrencySelect");
+      if (dropdown) {
+        dropdown.value = localStorage.getItem("fiq_currency") || "USD";
+        dropdown.addEventListener("change", (e) => {
+          localStorage.setItem("fiq_currency", e.target.value);
+          window.dispatchEvent(new StorageEvent('storage', { key: 'fiq_currency', newValue: e.target.value }));
+        });
+      }
+
+      document.querySelectorAll(".exp-input").forEach(input => {
+        input.addEventListener("input", calculateExpenses);
+      });
+      calculateExpenses();
+    });
+  </script>
+</body>
+</html>

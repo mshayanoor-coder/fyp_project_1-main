@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreelanceIQ - Invoice Generator</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    /* Scoped minor adjustments matching existing design tokens */
+    .invoice-item-row {
+      border: 1px solid #e8e8e8;
+      border-radius: 9px;
+      padding: 12px;
+      margin-bottom: 12px;
+      background: #fdfdfd;
+      position: relative;
+    }
+    .invoice-item-row .remove-item-btn {
+      background: #e5e7eb;
+      color: #4b5563;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+      margin-top: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .invoice-item-row .remove-item-btn:hover {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    .msg-limit {
+      color: #d97706;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+      display: block;
+    }
+    @media print {
+      .navbar, .card, .page-title, .page-sub, #download-btn, .remove-item-btn, .no-print {
+        display: none !important;
+      }
+      .grid-2 {
+        display: block !important;
+        width: 100% !important;
+      }
+      body, .page-wrap {
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      #invoice-preview {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        display: block !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="brand" href="home.html">Freelance<span>IQ</span></a>
+      <div class="nav-links">
+        <a class="tab" href="home.html">Home</a>
+        <a class="tab" href="calculator.html">Calculators</a>
+        <a class="tab" href="expense.html">Expenses</a>
+        <a class="tab" href="dashboard.html">Dashboard</a>
+        <a class="tab active" href="invoice.html">Invoice</a>
+        <a class="tab" href="compare.html">Compare</a>
+      </div>
+    </div>
+
+    <div class="currency-nav-wrap no-print">
+      <span class="currency-label">CURRENCY:</span>
+      <select id="globalCurrencySelect">
+        <option value="USD">USD ($)</option>
+        <option value="PKR">PKR (₨)</option>
+        <option value="GBP">GBP (£)</option>
+        <option value="EUR">EUR (€)</option>
+        <option value="AED">AED (د.إ)</option>
+      </select>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <div class="page-title">Invoice Generator</div>
+    <div class="page-sub">Fill in the form → see live preview</div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Invoice Details</div>
+        <div class="field">
+          <label>Your Name / Business</label>
+          <input type="text" id="inv-from" value="XYZ" maxlength="50">
+          <div class="field-error-msg" id="inv-from-error"></div>
+        </div>
+        <div class="field">
+          <label>Client Name</label>
+          <input type="text" id="inv-to" value="ABC Company" maxlength="50">
+          <div class="field-error-msg" id="inv-to-error"></div>
+        </div>
+        <div class="field">
+          <label>Invoice Date</label>
+          <input type="date" id="inv-date">
+          <div class="field-error-msg" id="inv-date-error"></div>
+        </div>
+        <div class="field" style="display: none;">
+          <label>Hidden Reference Currency</label>
+          <select id="inv-currency">
+            <option value="USD">USD</option>
+            <option value="PKR">PKR</option>
+            <option value="GBP">GBP</option>
+            <option value="EUR">EUR</option>
+            <option value="AED">AED</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Invoice Line Items Section -->
+        <div style="margin-top: 20px; margin-bottom: 20px;">
+          <label style="font-weight: 700; font-size: 13px; color: #111; display: block; margin-bottom: 10px;">Invoice Line Items</label>
+          <div id="invoice-items-container">
+            <!-- Row items will render dynamically here -->
+          </div>
+          <button type="button" id="add-item-btn" class="btn" style="background-color: #4b5563; margin-top: 5px;">
+            <i class="fa fa-plus"></i> Add Item
+          </button>
+          <span id="limit-message" class="msg-limit hidden">Maximum 8 items allowed.</span>
+        </div>
+
+        <div class="field">
+          <label>Tax % (0 if none)</label>
+          <input type="number" id="inv-tax" placeholder="0">
+        </div>
+      </div>
+
+      <div id="invoice-preview" class="invoice-box" style="background: #fff; padding: 24px; border-radius: 8px;">
+        <div class="inv-head" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+          <div>
+            <div class="inv-brand" style="font-size: 24px; font-weight: 800; color: #1D9E75;">INVOICE</div>
+            <div style="font-size:12px;color:#999;margin-top:5px;" id="p-date">—</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:15px;font-weight:700;" id="p-from">—</div>
+            <div style="font-size:12px;color:#888;">Freelancer</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#999;margin-bottom:4px; margin-top: 20px;">Billed to:</div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:18px;" id="p-to">—</div>
+        
+        <table class="inv-table" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <thead>
+            <tr style="border-bottom: 2px solid #eef2f6;">
+              <th style="text-align: left; padding: 8px 0; width: 50%;">Service / Item</th>
+              <th style="text-align: center; padding: 8px 0; width: 15%;">Qty</th>
+              <th style="text-align: right; padding: 8px 0; width: 15%;">Rate</th>
+              <th style="text-align: right; padding: 8px 0; width: 20%;">Total</th>
+            </tr>
+          </thead>
+          <tbody id="p-invoice-items-body">
+            <!-- Rendered dynamic item entries populated via javascript hook -->
+          </tbody>
+          <tfoot>
+            <tr style="border-top: 1px solid #eef2f6;">
+              <td colspan="3" style="text-align:right; padding: 12px 0; color: #666; font-weight: 600;">Subtotal:</td>
+              <td style="text-align:right; padding: 12px 0; font-weight: 600;" id="p-subtotal">—</td>
+            </tr>
+            <tr id="p-tax-row">
+              <td colspan="3" id="p-tax-label" style="text-align:right; color:#999; padding: 8px 0;">—</td>
+              <td style="text-align:right; color:#999; padding: 8px 0;" id="p-tax-val">—</td>
+            </tr>
+          </tfoot>
+        </table>
+        
+        <div class="inv-total" id="p-total" style="font-size: 20px; font-weight: 800; text-align: right; border-top: 2px solid #eef2f6; padding-top: 10px; color: #1D9E75;">—</div>
+
+        <button id="download-btn" class="btn" onclick="downloadInvoicePDF()" style="margin-top: 30px; width: 100%; background-color: #1D9E75;">
+          Print / PDF Export
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../javascript/invoice.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dropdown = document.getElementById("globalCurrencySelect");
+      const savedCurrency = localStorage.getItem("fiq_currency") || "USD";
+      if (dropdown) dropdown.value = savedCurrency;
+      
+      const formCurrency = document.getElementById("inv-currency");
+      if (formCurrency) formCurrency.value = savedCurrency;
+
+      document.querySelectorAll(".card > .field input").forEach(input => {
+        input.addEventListener("input", previewInvoice);
+      });
+
+      if (dropdown) {
+        dropdown.addEventListener("change", (e) => {
+          localStorage.setItem("fiq_currency", e.target.value);
+          if(formCurrency) formCurrency.value = e.target.value;
+          window.dispatchEvent(new StorageEvent('storage', { key: 'fiq_currency', newValue: e.target.value }));
+        });
+      }
+    });
+  </script>
+</body>
+</html>

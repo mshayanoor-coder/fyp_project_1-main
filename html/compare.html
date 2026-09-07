@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreelanceIQ - Platform Comparison</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-left">
+      <a class="brand" href="home.html">Freelance<span>IQ</span></a>
+      <div class="nav-links">
+        <a class="tab" href="home.html">Home</a>
+        <a class="tab" href="calculator.html">Calculators</a>
+        <a class="tab" href="expense.html">Expenses</a>
+        <a class="tab" href="dashboard.html">Dashboard</a>
+        <a class="tab" href="invoice.html">Invoice</a>
+        <a class="tab active" href="compare.html">Compare</a>
+      </div>
+    </div>
+
+    <div class="currency-nav-wrap no-print">
+      <span class="currency-label">CURRENCY:</span>
+      <select id="globalCurrencySelect">
+        <option value="USD">USD ($)</option>
+        <option value="PKR">PKR (₨)</option>
+        <option value="GBP">GBP (£)</option>
+        <option value="EUR">EUR (€)</option>
+        <option value="AED">AED (د.إ)</option>
+      </select>
+    </div>
+  </nav>
+
+  <div class="page-wrap">
+    <div class="page-title">Platform Comparison Tool</div>
+    <div class="page-sub">Enter a project value to see which platform pays the most</div>
+
+    <div class="card">
+      <div class="grid-2">
+        <div class="field">
+          <label>Project Value</label>
+          <input type="number" id="cmp-amount" placeholder="50000">
+        </div>
+        <div class="field" style="display: none;">
+          <label>Hidden Reference Currency</label>
+          <select id="cmp-currency"><option>PKR</option><option>USD</option><option>GBP</option><option>EUR</option><option>AED</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="compare-result">
+      <div class="grid-3">
+        <div class="compare-card" id="cmp-fiverr">
+          <div class="c-name">Fiverr</div><div class="c-fee">20% commission</div>
+          <div class="c-net" id="cmp-f-net">—</div><div class="c-lost" id="cmp-f-lost">—</div>
+        </div>
+        <div class="compare-card" id="cmp-upwork">
+          <div class="c-name">Upwork</div><div class="c-fee">10% commission</div>
+          <div class="c-net" id="cmp-u-net">—</div><div class="c-lost" id="cmp-u-lost">—</div>
+        </div>
+        <div class="compare-card" id="cmp-direct">
+          <div class="c-name">Direct Client</div><div class="c-fee">0% commission</div>
+          <div class="c-net" id="cmp-d-net">—</div><div class="c-lost" id="cmp-d-lost">—</div>
+        </div>
+      </div>
+      <div id="cmp-advice" style="font-size:13px; color:#555; text-align:center; margin-top:14px; padding:14px; background:#f8faf9; border-radius:10px;"></div>
+    </div>
+  </div>
+
+  <script src="../javascript/compare.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const dropdown = document.getElementById("globalCurrencySelect");
+      const savedCurrency = localStorage.getItem("fiq_currency") || "USD";
+      if (dropdown) dropdown.value = savedCurrency;
+      
+      const formCurrency = document.getElementById("cmp-currency");
+      if (formCurrency) formCurrency.value = savedCurrency;
+
+      const cmpInput = document.getElementById("cmp-amount");
+      if (cmpInput) {
+        cmpInput.addEventListener("input", calculateComparison);
+      }
+
+      if (dropdown) {
+        dropdown.addEventListener("change", (e) => {
+          localStorage.setItem("fiq_currency", e.target.value);
+          if(formCurrency) formCurrency.value = e.target.value;
+          window.dispatchEvent(new StorageEvent('storage', { key: 'fiq_currency', newValue: e.target.value }));
+        });
+      }
+
+      calculateComparison();
+    });
+  </script>
+</body>
+</html>
