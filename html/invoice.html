@@ -42,8 +42,18 @@
       margin-top: 6px;
       display: block;
     }
+    .field-error-msg {
+      color: #dc2626;
+      font-size: 11px;
+      margin-top: 4px;
+      display: none;
+      line-height: 1.3;
+    }
+    .input-error {
+      border-color: #dc2626 !important;
+    }
     @media print {
-      .navbar, .card, .page-title, .page-sub, #download-btn, .remove-item-btn, .no-print {
+      .navbar, .card, .page-title, .page-sub, #download-btn, .remove-item-btn, .no-print, .field-error-msg {
         display: none !important;
       }
       .grid-2 {
@@ -136,11 +146,13 @@
             <i class="fa fa-plus"></i> Add Item
           </button>
           <span id="limit-message" class="msg-limit hidden">Maximum 8 items allowed.</span>
+          <span id="items-validation-message" class="field-error-msg" style="margin-top: 6px;">Please fix any invalid items above before adding a new item.</span>
         </div>
 
         <div class="field">
           <label>Tax % (0 if none)</label>
           <input type="number" id="inv-tax" placeholder="0">
+          <div class="field-error-msg" id="inv-tax-error"></div>
         </div>
       </div>
 

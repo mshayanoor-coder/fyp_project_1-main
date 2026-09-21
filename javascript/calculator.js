@@ -22,7 +22,7 @@ const professionSchema = {
     "Digital Marketing": {
         fields: [
             { id: "grossIncomeInput", label: "Gross Income", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
-            { id: "platformFeeInput", label: "Platform Fee % (Fiverr=20, Upwork=10)", placeholder: "e.g., 20", defaultValue: 20, type: "percentage" },
+            { id: "platformFeeInput", label: "Platform Fee % (Fiverr=20, Upwork=10)", placeholder: "e.g.,0", defaultValue: 0, type: "percentage" },
             { id: "softwareCostInput", label: "Software / Tools Cost", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
             { id: "extraCostInput", label: "Ad Spend / Other Cost", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
             { id: "taxRateInput", label: "Tax Rate %", placeholder: "e.g., 0", defaultValue: 0, type: "percentage" }
@@ -196,7 +196,7 @@ const professionSchema = {
 };
 
 let currentCurrency = localStorage.getItem('fiq_currency') || 'USD';
-let currentProfession = 'Digital Marketing';
+let currentProfession = localStorage.getItem('fiq_active_profession') || 'Digital Marketing';
 
 const calculatorHeader = document.getElementById('calculatorHeader');
 const grossIncomeDisplay = document.getElementById('grossIncomeDisplay');
@@ -213,9 +213,48 @@ function attachZeroFocusHandling(input) {
     input.addEventListener('focus', function () {
         if (this.value === '0') {
             this.value = '';
+            this._lastValid = '';
         } else {
             this.select();
         }
+    });
+}
+
+function attachInputRestrictions(input, fieldType) {
+    const maxVal = (fieldType === 'percentage') ? 100 : 999999999.99;
+
+    input.min = "0";
+    input.max = String(maxVal);
+    input.step = "0.01";
+    input.setAttribute("inputmode", "decimal");
+
+    input.addEventListener('keydown', (e) => {
+        if (['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        const val = input.value;
+
+        if (val === '') {
+            input._lastValid = '';
+            return;
+        }
+
+        const validPattern = /^\d*(\.\d{0,2})?$/;
+        if (!validPattern.test(val)) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal) && numVal > maxVal) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        input._lastValid = val;
     });
 }
 
@@ -225,13 +264,8 @@ function renderDynamicForm(profession, checkOldValues = false) {
     const schema = professionSchema[profession];
     if (!schema) return;
 
-    const preservedValues = {};
-    if (checkOldValues) {
-        schema.fields.forEach(field => {
-            const inputNode = document.getElementById(field.id);
-            if (inputNode) preservedValues[field.id] = inputNode.value;
-        });
-    }
+    const savedAllInputs = JSON.parse(localStorage.getItem('fiq_profession_inputs') || '{}');
+    const savedProfInputs = savedAllInputs[profession] || {};
 
     const conversionFactor = exchangeRates[currentCurrency] / exchangeRates['PKR'];
     formContainer.innerHTML = ''; 
@@ -250,8 +284,13 @@ function renderDynamicForm(profession, checkOldValues = false) {
         input.id = field.id;
         input.placeholder = "0";
 
-        if (checkOldValues && preservedValues[field.id] !== undefined) {
-            input.value = preservedValues[field.id];
+        attachInputRestrictions(input, field.type);
+
+        if (savedProfInputs[field.id] !== undefined && savedProfInputs[field.id] !== '') {
+            input.value = savedProfInputs[field.id];
+        } else if (checkOldValues) {
+            const oldNode = document.getElementById(field.id);
+            if (oldNode) input.value = oldNode.value;
         } else {
             if (field.defaultValue && field.defaultValue !== 0) {
                 if (field.type === 'currency') {
@@ -263,6 +302,8 @@ function renderDynamicForm(profession, checkOldValues = false) {
                 input.value = '';
             }
         }
+
+        input._lastValid = input.value;
 
         attachZeroFocusHandling(input);
         input.addEventListener('input', calculateNetProfit);
@@ -278,10 +319,30 @@ function calculateNetProfit() {
     if (!schema) return;
 
     const inputValues = {};
+    const rawStoredValues = {};
+    let hasAnyInput = false;
+
     schema.fields.forEach(field => {
         const inputNode = document.getElementById(field.id);
-        inputValues[field.id] = inputNode ? (parseFloat(inputNode.value) || 0) : 0;
+        const val = inputNode ? inputNode.value.trim() : '';
+        rawStoredValues[field.id] = val;
+
+        if (val !== '' && !isNaN(parseFloat(val)) && parseFloat(val) !== 0) {
+            hasAnyInput = true;
+        }
+
+        const parsed = inputNode ? parseFloat(inputNode.value) : 0;
+        inputValues[field.id] = (isNaN(parsed) || !isFinite(parsed) || parsed < 0) ? 0 : parsed;
     });
+
+    // Save or clear this profession's specific field inputs
+    const savedAllInputs = JSON.parse(localStorage.getItem('fiq_profession_inputs') || '{}');
+    if (hasAnyInput) {
+        savedAllInputs[currentProfession] = rawStoredValues;
+    } else {
+        delete savedAllInputs[currentProfession];
+    }
+    localStorage.setItem('fiq_profession_inputs', JSON.stringify(savedAllInputs));
 
     const results = schema.calculate(inputValues);
 
@@ -304,6 +365,15 @@ function calculateNetProfit() {
         if (softwareCostDisplay) softwareCostDisplay.parentElement.style.display = 'none';
         if (extraCostDisplay) extraCostDisplay.parentElement.style.display = 'none';
     }
+
+    // Connect & persist net income to storage for dashboard (wipes cleanly if inputs are removed)
+    const allNet = JSON.parse(localStorage.getItem('fiq_professions_net') || '{}');
+    if (hasAnyInput) {
+        allNet[currentProfession] = results.net;
+    } else {
+        delete allNet[currentProfession];
+    }
+    localStorage.setItem('fiq_professions_net', JSON.stringify(allNet));
 }
 
 function formatCurrency(value, currency) {
@@ -327,7 +397,9 @@ function calculateProfessionMargins() {
         schema.fields.forEach(field => {
             const inputNode = document.getElementById(field.id);
             if (inputNode && field.type === 'currency' && inputNode.value) {
-                inputNode.value = Math.round(parseFloat(inputNode.value) * conversionFactor);
+                const converted = Math.round(parseFloat(inputNode.value) * conversionFactor);
+                inputNode.value = Math.min(converted, 999999999.99);
+                inputNode._lastValid = inputNode.value;
             }
         });
     }
@@ -342,19 +414,8 @@ tabButtons.forEach(button => {
         this.classList.add('active');
 
         let rawProfession = this.getAttribute('data-profession');
-        
-        if (rawProfession === "Digital Marketing") currentProfession = "Digital Marketing";
-        else if (rawProfession === "TikTok Shop") currentProfession = "TikTok Shop";
-        else if (rawProfession === "Video Editing") currentProfession = "Video Editing";
-        else if (rawProfession === "Audio Editing") currentProfession = "Audio Editing";
-        else if (rawProfession === "Graphic Design") currentProfession = "Graphic Design";
-        else if (rawProfession === "Content Writing") currentProfession = "Content Writing";
-        else if (rawProfession === "Social Media") currentProfession = "Social Media";
-        else if (rawProfession === "Web Development") currentProfession = "Web Development";
-        else if (rawProfession === "Photography") currentProfession = "Photography";
-        else if (rawProfession === "E-Commerce" || rawProfession === "E-commerce") currentProfession = "E-Commerce";
-        else if (rawProfession === "SEO") currentProfession = "SEO";
-        else currentProfession = rawProfession;
+        currentProfession = rawProfession;
+        localStorage.setItem('fiq_active_profession', currentProfession);
 
         if (calculatorHeader) calculatorHeader.innerText = `${currentProfession} Calculator`;
 
@@ -364,6 +425,13 @@ tabButtons.forEach(button => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (currentProfession) {
+        document.querySelector('.category-btn.active')?.classList.remove('active');
+        const activeBtn = Array.from(tabButtons).find(btn => btn.getAttribute('data-profession') === currentProfession);
+        if (activeBtn) activeBtn.classList.add('active');
+        if (calculatorHeader) calculatorHeader.innerText = `${currentProfession} Calculator`;
+    }
+
     renderDynamicForm(currentProfession, false);
     calculateNetProfit();
 });

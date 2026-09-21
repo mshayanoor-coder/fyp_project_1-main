@@ -12,10 +12,92 @@ function attachZeroFocusHandling(input) {
     input.addEventListener('focus', function () {
         if (this.value === '0') {
             this.value = '';
+            this._lastValid = '';
         } else {
             this.select();
         }
     });
+}
+
+function attachInputRestrictions(input, fieldType) {
+    const maxVal = (fieldType === 'percentage') ? 100 : 999999999.99;
+
+    input.min = "0";
+    input.max = String(maxVal);
+    input.step = "0.01";
+    input.setAttribute("inputmode", "decimal");
+
+    input.addEventListener('keydown', (e) => {
+        if (['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        const val = input.value;
+
+        if (val === '') {
+            input._lastValid = '';
+            return;
+        }
+
+        const validPattern = /^\d*(\.\d{0,2})?$/;
+        if (!validPattern.test(val)) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal) && numVal > maxVal) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        input._lastValid = val;
+    });
+}
+
+function loadDashboardState() {
+    const allNet = JSON.parse(localStorage.getItem('fiq_professions_net') || '{}');
+    const netKeys = Object.keys(allNet);
+    const netSum = Object.values(allNet).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+    const totalExp = localStorage.getItem('fiq_total_expense');
+    const savedDash = JSON.parse(localStorage.getItem('fiq_dashboard_inputs') || '{}');
+
+    const dIncomeEl = document.getElementById('d-income');
+    const dHouseEl = document.getElementById('d-house');
+    const dBizexpEl = document.getElementById('d-bizexp');
+    const dTaxrateEl = document.getElementById('d-taxrate');
+
+    // 1. Synchronize income directly with calculator data
+    if (dIncomeEl) {
+        if (netKeys.length > 0) {
+            dIncomeEl.value = netSum !== 0 ? netSum.toFixed(2) : "0";
+        } else {
+            dIncomeEl.value = '';
+        }
+        dIncomeEl._lastValid = dIncomeEl.value;
+    }
+
+    // 2. Synchronize house expenses
+    if (dHouseEl) {
+        if (totalExp !== null && totalExp !== undefined && totalExp !== '') {
+            dHouseEl.value = parseFloat(totalExp) > 0 ? parseFloat(totalExp).toFixed(2) : "0";
+        } else {
+            dHouseEl.value = '';
+        }
+        dHouseEl._lastValid = dHouseEl.value;
+    }
+
+    // 3. Restore dashboard-specific entries
+    if (dBizexpEl && savedDash.bizExp !== undefined) {
+        dBizexpEl.value = savedDash.bizExp;
+        dBizexpEl._lastValid = dBizexpEl.value;
+    }
+    if (dTaxrateEl && savedDash.taxRate !== undefined) {
+        dTaxrateEl.value = savedDash.taxRate;
+        dTaxrateEl._lastValid = dTaxrateEl.value;
+    }
 }
 
 function calculateDashboard() {
@@ -30,6 +112,14 @@ function calculateDashboard() {
     const bizExp = dBizexpEl ? (parseFloat(dBizexpEl.value) || 0) : 0;
     const taxRate = dTaxrateEl ? (parseFloat(dTaxrateEl.value) || 0) : 0;
     const house = dHouseEl ? (parseFloat(dHouseEl.value) || 0) : 0;
+
+    // Permanently remember dashboard entries
+    localStorage.setItem('fiq_dashboard_inputs', JSON.stringify({
+        income: dIncomeEl ? dIncomeEl.value : '',
+        bizExp: dBizexpEl ? dBizexpEl.value : '',
+        taxRate: dTaxrateEl ? dTaxrateEl.value : '',
+        house: dHouseEl ? dHouseEl.value : ''
+    }));
 
     const taxAmt = income * (taxRate / 100);
     const realNet = income - bizExp - taxAmt - house;
@@ -72,18 +162,35 @@ function calculateDashboard() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    const inputIds = ['d-income', 'd-bizexp', 'd-taxrate', 'd-house'];
-    inputIds.forEach(id => {
+    const currencyFields = ['d-income', 'd-bizexp', 'd-house'];
+    currencyFields.forEach(id => {
         const inputEl = document.getElementById(id);
         if (inputEl) {
+            attachInputRestrictions(inputEl, 'currency');
+            inputEl._lastValid = inputEl.value;
             attachZeroFocusHandling(inputEl);
             inputEl.addEventListener('input', calculateDashboard);
         }
     });
+
+    const taxRateEl = document.getElementById('d-taxrate');
+    if (taxRateEl) {
+        attachInputRestrictions(taxRateEl, 'percentage');
+        taxRateEl._lastValid = taxRateEl.value;
+        attachZeroFocusHandling(taxRateEl);
+        taxRateEl.addEventListener('input', calculateDashboard);
+    }
+
+    loadDashboardState();
     calculateDashboard();
 });
 
 window.addEventListener('storage', (e) => {
+    if (e.key === 'fiq_professions_net' || e.key === 'fiq_total_expense') {
+        loadDashboardState();
+        calculateDashboard();
+    }
+
     if (e.key === 'fiq_currency') {
         const oldCurrency = currentCurrency;
         currentCurrency = e.newValue || 'USD';
@@ -94,7 +201,9 @@ window.addEventListener('storage', (e) => {
         inputIds.forEach(id => {
             const el = document.getElementById(id);
             if (el && el.value) {
-                el.value = Math.round(parseFloat(el.value) * conversionFactor);
+                const converted = Math.round(parseFloat(el.value) * conversionFactor);
+                el.value = Math.min(converted, 999999999.99);
+                el._lastValid = el.value;
             }
         });
 

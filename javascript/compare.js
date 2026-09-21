@@ -12,9 +12,48 @@ function attachZeroFocusHandling(input) {
     input.addEventListener('focus', function () {
         if (this.value === '0') {
             this.value = '';
+            this._lastValid = '';
         } else {
             this.select();
         }
+    });
+}
+
+function attachInputRestrictions(input, fieldType) {
+    const maxVal = (fieldType === 'percentage') ? 100 : 999999999.99;
+
+    input.min = "0";
+    input.max = String(maxVal);
+    input.step = "0.01";
+    input.setAttribute("inputmode", "decimal");
+
+    input.addEventListener('keydown', (e) => {
+        if (['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        const val = input.value;
+
+        if (val === '') {
+            input._lastValid = '';
+            return;
+        }
+
+        const validPattern = /^\d*(\.\d{0,2})?$/;
+        if (!validPattern.test(val)) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal) && numVal > maxVal) {
+            input.value = input._lastValid !== undefined ? input._lastValid : '';
+            return;
+        }
+
+        input._lastValid = val;
     });
 }
 
@@ -103,6 +142,8 @@ function calculateComparison() {
 document.addEventListener("DOMContentLoaded", () => {
     const cmpAmountInput = document.getElementById('cmp-amount');
     if (cmpAmountInput) {
+        attachInputRestrictions(cmpAmountInput, 'currency');
+        cmpAmountInput._lastValid = cmpAmountInput.value;
         attachZeroFocusHandling(cmpAmountInput);
         cmpAmountInput.addEventListener('input', calculateComparison);
     }
@@ -118,7 +159,9 @@ window.addEventListener('storage', (e) => {
         
         const cmpAmountInput = document.getElementById('cmp-amount');
         if (cmpAmountInput && cmpAmountInput.value) {
-            cmpAmountInput.value = Math.round(parseFloat(cmpAmountInput.value) * conversionFactor);
+            const converted = Math.round(parseFloat(cmpAmountInput.value) * conversionFactor);
+            cmpAmountInput.value = Math.min(converted, 999999999.99);
+            cmpAmountInput._lastValid = cmpAmountInput.value;
         }
 
         calculateComparison();

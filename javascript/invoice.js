@@ -12,14 +12,108 @@ function attachZeroFocusHandling(input) {
     input.addEventListener('focus', function () {
         if (this.value === '0') {
             this.value = '';
-        } else {
-            this.select();
         }
     });
 }
 
 // --------------------------------------------------------------------------
-// RESTRICTION & VALIDATION LOGIC
+// VALIDATION & RESTRICTION HELPERS
+// --------------------------------------------------------------------------
+function validateTextRule(val, maxLength) {
+    if (val === '') return true;
+    if (val.length > maxLength) return false;
+    // Disallow leading space
+    if (val.startsWith(' ')) return false;
+    // Allow only alphabets and single spaces
+    if (!/^[a-zA-Z]+( [a-zA-Z]+)* ?$/.test(val)) return false;
+    // Disallow more than 2 consecutive occurrences of the same alphabet
+    if (/([a-zA-Z])\1\1/i.test(val)) return false;
+    return true;
+}
+
+function validateQuantity(val) {
+    if (val === '') return true;
+    // Pure digits only
+    if (!/^\d+$/.test(val)) return false;
+    const num = Number(val);
+    if (num < 0 || num > 999999999) return false;
+    return true;
+}
+
+function validateUnitPrice(val) {
+    if (val === '') return true;
+    // Valid decimal representation up to 2 decimal places, including in-progress trailing dot
+    if (!/^\d+(\.\d{0,2})?$/.test(val)) return false;
+    const num = parseFloat(val);
+    if (num < 0 || num > 999999999.99) return false;
+    return true;
+}
+
+function attachControlledInput(input, validator, initialVal = '') {
+    let lastValid = validator(initialVal) ? initialVal : '';
+    input.dataset.lastValid = lastValid;
+
+    // Block disallowed keyboard characters directly
+    input.addEventListener('keydown', function (e) {
+        if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'].includes(e.key)) {
+            return;
+        }
+        if (e.ctrlKey || e.metaKey) {
+            return;
+        }
+        // Disallow exponential and sign keys only on numeric inputs so letters (like 'e') work fine in text inputs
+        if (this.type === 'number' && ['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    });
+
+    input.addEventListener('input', function () {
+        const val = this.value;
+        if (validator(val)) {
+            lastValid = val;
+            this.dataset.lastValid = val;
+        } else {
+            // Revert immediately to last valid value without modification
+            this.value = lastValid;
+        }
+    });
+}
+
+function attachLineItemRestrictions(row) {
+    const nameInput = row.querySelector('.item-name');
+    const descInput = row.querySelector('.item-desc');
+    const qtyInput = row.querySelector('.item-qty');
+    const priceInput = row.querySelector('.item-price');
+
+    if (nameInput) {
+        nameInput.setAttribute('maxlength', '50');
+        attachControlledInput(nameInput, val => validateTextRule(val, 50), nameInput.value);
+    }
+
+    if (descInput) {
+        descInput.setAttribute('maxlength', '100');
+        attachControlledInput(descInput, val => validateTextRule(val, 100), descInput.value);
+    }
+
+    if (qtyInput) {
+        qtyInput.setAttribute('min', '0');
+        qtyInput.setAttribute('max', '999999999');
+        qtyInput.setAttribute('step', '1');
+        qtyInput.setAttribute('inputmode', 'numeric');
+        attachControlledInput(qtyInput, validateQuantity, qtyInput.value);
+    }
+
+    if (priceInput) {
+        priceInput.setAttribute('min', '0');
+        priceInput.setAttribute('max', '999999999.99');
+        priceInput.setAttribute('step', '0.01');
+        priceInput.setAttribute('inputmode', 'decimal');
+        attachControlledInput(priceInput, validateUnitPrice, priceInput.value);
+    }
+}
+
+// --------------------------------------------------------------------------
+// HEADER RESTRICTION LOGIC
 // --------------------------------------------------------------------------
 function setupRestrictions() {
     const today = new Date().toISOString().split('T')[0];
@@ -59,30 +153,25 @@ function setupRestrictions() {
             let val = this.value;
             let errorMsg = '';
 
-            // 1. Check for non-alphabet / non-space characters
             if (/[^a-zA-Z ]/.test(val)) {
                 errorMsg = 'Numbers and special characters are not allowed.';
                 val = val.replace(/[^a-zA-Z ]/g, '');
             }
 
-            // 2. Check for excessive / double spaces
             if (/  +/.test(val)) {
                 errorMsg = 'Multiple spaces are not allowed.';
                 val = val.replace(/  +/g, ' ');
             }
 
-            // Disallow leading spaces
             if (val.startsWith(' ')) {
                 val = val.trimStart();
             }
 
-            // 3. Check for maximum 50 characters
             if (val.length > 50) {
                 errorMsg = 'Maximum 50 characters allowed.';
                 val = val.substring(0, 50);
             }
 
-            // 4. Ensure no individual alphabetic character appears more than 2 times
             const counts = {};
             let filteredVal = '';
             let exceededLetter = null;
@@ -122,7 +211,7 @@ function setupRestrictions() {
 
 document.addEventListener("DOMContentLoaded", () => {
     const dateInput = document.getElementById('inv-date');
-    if(dateInput) {
+    if (dateInput) {
         dateInput.value = new Date().toISOString().split('T')[0];
     }
 
@@ -170,21 +259,21 @@ function initInvoiceItemsEngine() {
               <div class="grid-2" style="gap: 10px; margin-bottom: 8px;">
                 <div class="form-group" style="margin-bottom: 0;">
                   <label>Item / Service Name</label>
-                  <input type="text" class="item-name" value="${itemName}" placeholder="e.g. Service Item">
+                  <input type="text" class="item-name" value="${itemName}" placeholder="Item / Service Name" maxlength="50">
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                   <label>Description (Optional)</label>
-                  <input type="text" class="item-desc" value="${desc}" placeholder="Optional details">
+                  <input type="text" class="item-desc" value="${desc}" placeholder="Optional details" maxlength="100">
                 </div>
               </div>
               <div style="display: flex; gap: 10px; align-items: flex-end;">
                 <div class="form-group" style="margin-bottom: 0; flex: 1;">
                   <label>Quantity</label>
-                  <input type="number" class="item-qty" value="${qty}" min="1">
+                  <input type="number" class="item-qty" value="${qty}" min="0" max="999999999" step="1" inputmode="numeric">
                 </div>
                 <div class="form-group" style="margin-bottom: 0; flex: 2;">
                   <label>Unit Price</label>
-                  <input type="number" class="item-price" value="${price}" placeholder="0" min="0">
+                  <input type="number" class="item-price" value="${price}" placeholder="0" min="0" max="999999999.99" step="0.01" inputmode="decimal">
                 </div>
                 <div style="flex: 1; text-align: right; padding-bottom: 10px; font-weight: 600; color: #4b5563; font-size: 13px;">
                   Row Total: <span class="item-row-total">0.00</span>
@@ -196,6 +285,9 @@ function initInvoiceItemsEngine() {
         
         container.insertAdjacentHTML('beforeend', rowHTML);
         const newRow = document.getElementById(rowId);
+
+        // Attach input restrictions for the four target fields
+        attachLineItemRestrictions(newRow);
 
         newRow.querySelectorAll('input[type="number"]').forEach(input => {
             attachZeroFocusHandling(input);
@@ -245,7 +337,7 @@ function initInvoiceItemsEngine() {
         if (!container) return data;
         container.querySelectorAll('.invoice-item-row').forEach(row => {
             data.push({
-                name: row.querySelector('.item-name').value || 'Service Item',
+                name: row.querySelector('.item-name').value || '',
                 desc: row.querySelector('.item-desc').value || '',
                 qty: parseFloat(row.querySelector('.item-qty').value) || 0,
                 price: parseFloat(row.querySelector('.item-price').value) || 0,
@@ -256,7 +348,7 @@ function initInvoiceItemsEngine() {
     };
 
     if (container && container.querySelectorAll('.invoice-item-row').length === 0) {
-        createItemRow('Service Item', '', 1, '');
+        createItemRow('', '', 1, '');
     }
 }
 
@@ -316,11 +408,12 @@ function previewInvoice() {
             `;
         } else {
             items.forEach(item => {
+                const displayName = item.name || 'Service Item';
                 const descriptionLine = item.desc ? `<div style="font-size: 11px; color: #777; margin-top: 2px;">${item.desc}</div>` : '';
                 const rowHTML = `
                     <tr style="border-bottom: 1px solid #eef2f6; vertical-align: top;">
                       <td style="padding: 12px 0;">
-                        <div style="font-weight: 600; color: #222;">${item.name}</div>
+                        <div style="font-weight: 600; color: #222;">${displayName}</div>
                         ${descriptionLine}
                       </td>
                       <td style="padding: 12px 0; text-align: center;">${item.qty}</td>
