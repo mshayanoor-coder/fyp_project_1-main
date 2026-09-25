@@ -7,6 +7,13 @@ const currencySigns = { USD: '$', PKR: '₨', GBP: '£', EUR: '€', AED: 'د.إ
 
 let currentCurrency = localStorage.getItem('fiq_currency') || 'USD';
 
+function cleanLeadingZeros(val) {
+    if (!val) return '';
+    if (/^0+$/.test(val)) return '0';
+    if (/^0+\d/.test(val)) return val.replace(/^0+/, '');
+    return val;
+}
+
 function attachZeroFocusHandling(input) {
     if (!input.placeholder) input.placeholder = "0";
     input.addEventListener('focus', function () {
@@ -34,9 +41,10 @@ function attachInputRestrictions(input, fieldType) {
     });
 
     input.addEventListener('input', () => {
-        const val = input.value;
+        let val = cleanLeadingZeros(input.value);
 
         if (val === '') {
+            input.value = '';
             input._lastValid = '';
             return;
         }
@@ -53,6 +61,7 @@ function attachInputRestrictions(input, fieldType) {
             return;
         }
 
+        input.value = val;
         input._lastValid = val;
     });
 }
@@ -69,7 +78,6 @@ function loadDashboardState() {
     const dBizexpEl = document.getElementById('d-bizexp');
     const dTaxrateEl = document.getElementById('d-taxrate');
 
-    // 1. Synchronize income directly with calculator data
     if (dIncomeEl) {
         if (netKeys.length > 0) {
             dIncomeEl.value = netSum !== 0 ? netSum.toFixed(2) : "0";
@@ -79,7 +87,6 @@ function loadDashboardState() {
         dIncomeEl._lastValid = dIncomeEl.value;
     }
 
-    // 2. Synchronize house expenses
     if (dHouseEl) {
         if (totalExp !== null && totalExp !== undefined && totalExp !== '') {
             dHouseEl.value = parseFloat(totalExp) > 0 ? parseFloat(totalExp).toFixed(2) : "0";
@@ -89,7 +96,6 @@ function loadDashboardState() {
         dHouseEl._lastValid = dHouseEl.value;
     }
 
-    // 3. Restore dashboard-specific entries
     if (dBizexpEl && savedDash.bizExp !== undefined) {
         dBizexpEl.value = savedDash.bizExp;
         dBizexpEl._lastValid = dBizexpEl.value;
@@ -113,7 +119,6 @@ function calculateDashboard() {
     const taxRate = dTaxrateEl ? (parseFloat(dTaxrateEl.value) || 0) : 0;
     const house = dHouseEl ? (parseFloat(dHouseEl.value) || 0) : 0;
 
-    // Permanently remember dashboard entries
     localStorage.setItem('fiq_dashboard_inputs', JSON.stringify({
         income: dIncomeEl ? dIncomeEl.value : '',
         bizExp: dBizexpEl ? dBizexpEl.value : '',

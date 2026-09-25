@@ -166,7 +166,7 @@ const professionSchema = {
         fields: [
             { id: "revenue", label: "Total Revenue", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
             { id: "productCost", label: "Product Cost", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
-            { id: "shipping", label: "Shipping", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
+            { id: "shipping", label: "Shipping Cost", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
             { id: "marketingCost", label: "Marketing Cost", placeholder: "e.g., 0", defaultValue: 0, type: "currency" },
             { id: "platformFee", label: "Platform Fee (%)", placeholder: "e.g., 0", defaultValue: 0, type: "percentage" },
             { id: "taxRate", label: "Tax Rate (%)", placeholder: "e.g., 0", defaultValue: 0, type: "percentage" }
@@ -208,6 +208,13 @@ const netProfitDisplay = document.getElementById('netProfitDisplay');
 
 const formContainer = document.getElementById('dynamicFormContainer'); 
 
+function cleanLeadingZeros(val) {
+    if (!val) return '';
+    if (/^0+$/.test(val)) return '0';
+    if (/^0+\d/.test(val)) return val.replace(/^0+/, '');
+    return val;
+}
+
 function attachZeroFocusHandling(input) {
     if (!input.placeholder) input.placeholder = "0";
     input.addEventListener('focus', function () {
@@ -235,9 +242,10 @@ function attachInputRestrictions(input, fieldType) {
     });
 
     input.addEventListener('input', () => {
-        const val = input.value;
+        let val = cleanLeadingZeros(input.value);
 
         if (val === '') {
+            input.value = '';
             input._lastValid = '';
             return;
         }
@@ -254,6 +262,7 @@ function attachInputRestrictions(input, fieldType) {
             return;
         }
 
+        input.value = val;
         input._lastValid = val;
     });
 }
@@ -335,7 +344,6 @@ function calculateNetProfit() {
         inputValues[field.id] = (isNaN(parsed) || !isFinite(parsed) || parsed < 0) ? 0 : parsed;
     });
 
-    // Save or clear this profession's specific field inputs
     const savedAllInputs = JSON.parse(localStorage.getItem('fiq_profession_inputs') || '{}');
     if (hasAnyInput) {
         savedAllInputs[currentProfession] = rawStoredValues;
@@ -366,7 +374,6 @@ function calculateNetProfit() {
         if (extraCostDisplay) extraCostDisplay.parentElement.style.display = 'none';
     }
 
-    // Connect & persist net income to storage for dashboard (wipes cleanly if inputs are removed)
     const allNet = JSON.parse(localStorage.getItem('fiq_professions_net') || '{}');
     if (hasAnyInput) {
         allNet[currentProfession] = results.net;

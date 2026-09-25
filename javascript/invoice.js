@@ -7,12 +7,62 @@ const currencySigns = { USD: '$', PKR: '₨', GBP: '£', EUR: '€', AED: 'د.إ
 
 let currentCurrency = localStorage.getItem('fiq_currency') || 'USD';
 
+function cleanLeadingZeros(val) {
+    if (!val) return '';
+    if (/^0+$/.test(val)) return '0';
+    if (/^0+\d/.test(val)) return val.replace(/^0+/, '');
+    return val;
+}
+
 function attachZeroFocusHandling(input) {
     if (!input.placeholder) input.placeholder = "0";
     input.addEventListener('focus', function () {
         if (this.value === '0') {
             this.value = '';
+            this.dataset.lastValid = '';
+        } else {
+            this.select();
         }
+    });
+}
+
+function attachInputRestrictions(input, fieldType) {
+    const maxVal = (fieldType === 'percentage') ? 100 : 999999999.99;
+
+    input.min = "0";
+    input.max = String(maxVal);
+    input.step = "0.01";
+    input.setAttribute("inputmode", "decimal");
+
+    input.addEventListener('keydown', (e) => {
+        if (['e', 'E', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+        }
+    });
+
+    input.addEventListener('input', () => {
+        let val = cleanLeadingZeros(input.value);
+
+        if (val === '') {
+            input.value = '';
+            input.dataset.lastValid = '';
+            return;
+        }
+
+        const validPattern = /^\d*(\.\d{0,2})?$/;
+        if (!validPattern.test(val)) {
+            input.value = input.dataset.lastValid !== undefined ? input.dataset.lastValid : '';
+            return;
+        }
+
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal) && numVal > maxVal) {
+            input.value = input.dataset.lastValid !== undefined ? input.dataset.lastValid : '';
+            return;
+        }
+
+        input.value = val;
+        input.dataset.lastValid = val;
     });
 }
 
@@ -22,18 +72,14 @@ function attachZeroFocusHandling(input) {
 function validateTextRule(val, maxLength) {
     if (val === '') return true;
     if (val.length > maxLength) return false;
-    // Disallow leading space
     if (val.startsWith(' ')) return false;
-    // Allow only alphabets and single spaces
     if (!/^[a-zA-Z]+( [a-zA-Z]+)* ?$/.test(val)) return false;
-    // Disallow more than 2 consecutive occurrences of the same alphabet
     if (/([a-zA-Z])\1\1/i.test(val)) return false;
     return true;
 }
 
 function validateQuantity(val) {
     if (val === '') return true;
-    // Pure digits only
     if (!/^\d+$/.test(val)) return false;
     const num = Number(val);
     if (num < 0 || num > 999999999) return false;
@@ -42,7 +88,6 @@ function validateQuantity(val) {
 
 function validateUnitPrice(val) {
     if (val === '') return true;
-    // Valid decimal representation up to 2 decimal places, including in-progress trailing dot
     if (!/^\d+(\.\d{0,2})?$/.test(val)) return false;
     const num = parseFloat(val);
     if (num < 0 || num > 999999999.99) return false;
@@ -53,7 +98,6 @@ function attachControlledInput(input, validator, initialVal = '') {
     let lastValid = validator(initialVal) ? initialVal : '';
     input.dataset.lastValid = lastValid;
 
-    // Block disallowed keyboard characters directly
     input.addEventListener('keydown', function (e) {
         if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Home', 'End'].includes(e.key)) {
             return;
@@ -61,19 +105,22 @@ function attachControlledInput(input, validator, initialVal = '') {
         if (e.ctrlKey || e.metaKey) {
             return;
         }
-        // Disallow exponential and sign keys only on numeric inputs so letters (like 'e') work fine in text inputs
         if (this.type === 'number' && ['e', 'E', '+', '-'].includes(e.key)) {
             e.preventDefault();
         }
     });
 
     input.addEventListener('input', function () {
-        const val = this.value;
+        let val = this.value;
+        if (this.type === 'number') {
+            val = cleanLeadingZeros(val);
+        }
+
         if (validator(val)) {
             lastValid = val;
+            this.value = val;
             this.dataset.lastValid = val;
         } else {
-            // Revert immediately to last valid value without modification
             this.value = lastValid;
         }
     });
@@ -217,6 +264,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const invTaxEl = document.getElementById('inv-tax');
     if (invTaxEl) {
+        attachInputRestrictions(invTaxEl, 'percentage');
+        invTaxEl.dataset.lastValid = invTaxEl.value;
         attachZeroFocusHandling(invTaxEl);
         invTaxEl.addEventListener('input', previewInvoice);
     }
@@ -286,7 +335,6 @@ function initInvoiceItemsEngine() {
         container.insertAdjacentHTML('beforeend', rowHTML);
         const newRow = document.getElementById(rowId);
 
-        // Attach input restrictions for the four target fields
         attachLineItemRestrictions(newRow);
 
         newRow.querySelectorAll('input[type="number"]').forEach(input => {

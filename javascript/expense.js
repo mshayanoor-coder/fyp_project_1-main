@@ -7,6 +7,13 @@ const currencySigns = { USD: '$', PKR: '₨', GBP: '£', EUR: '€', AED: 'د.إ
 
 let currentCurrency = localStorage.getItem('fiq_currency') || 'USD';
 
+function cleanLeadingZeros(val) {
+    if (!val) return '';
+    if (/^0+$/.test(val)) return '0';
+    if (/^0+\d/.test(val)) return val.replace(/^0+/, '');
+    return val;
+}
+
 function attachZeroFocusHandling(input) {
     if (!input.placeholder) input.placeholder = "0";
     input.addEventListener('focus', function () {
@@ -34,9 +41,10 @@ function attachInputRestrictions(input, fieldType) {
     });
 
     input.addEventListener('input', () => {
-        const val = input.value;
+        let val = cleanLeadingZeros(input.value);
 
         if (val === '') {
+            input.value = '';
             input._lastValid = '';
             return;
         }
@@ -53,6 +61,7 @@ function attachInputRestrictions(input, fieldType) {
             return;
         }
 
+        input.value = val;
         input._lastValid = val;
     });
 }
@@ -81,7 +90,6 @@ function calculateExpenses() {
         inputState[index] = input.value;
     });
 
-    // Permanently persist individual field inputs and total
     localStorage.setItem('fiq_saved_expense_inputs', JSON.stringify(inputState));
     localStorage.setItem('fiq_total_expense', total);
 
