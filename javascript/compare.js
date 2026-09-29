@@ -41,7 +41,7 @@ function attachInputRestrictions(input, fieldType) {
             return;
         }
 
-        const validPattern = /^\d*(\.\d{0,2})?$/;
+        const validPattern = /^(?:0(?:\.\d{0,2})?|[1-9]\d*(\.\d{0,2})?|\.\d{0,2})?$/;
         if (!validPattern.test(val)) {
             input.value = input._lastValid !== undefined ? input._lastValid : '';
             return;
