@@ -65,22 +65,22 @@ function calculateComparison() {
     const cmpInput = document.getElementById('cmp-amount');
     const amount = cmpInput ? (parseFloat(cmpInput.value) || 0) : 0;
 
-    const fiverrNet = amount * 0.80;
+    // Fiverr deduction: flat 20%
     const fiverrLost = amount * 0.20;
+    const fiverrNet = amount - fiverrLost;
 
-    const upworkFee = amount <= 500
-        ? amount * 0.20
-        : (500 * 0.20) + ((amount - 500) * 0.10);
-
+    // Upwork deduction: flat 10%
+    const upworkFee = amount * 0.10;
     const upworkNet = amount - upworkFee;
 
+    // Direct client: 0% deduction
     const directNet = amount * 1.00;
 
     const fractionDigits = (currentCurrency === 'PKR') ? 0 : 2;
     const sign = currencySigns[currentCurrency] || '$';
 
     function fmt(n) {
-        return sign + ' ' + Math.round(n).toLocaleString(undefined, {
+        return sign + ' ' + Number(n).toLocaleString(undefined, {
             minimumFractionDigits: fractionDigits,
             maximumFractionDigits: fractionDigits
         });
@@ -155,10 +155,11 @@ window.addEventListener('storage', (e) => {
 
         if (cmpAmountInput && cmpAmountInput.value) {
             const converted =
-                Math.round(parseFloat(cmpAmountInput.value) * conversionFactor);
+                (parseFloat(cmpAmountInput.value) * conversionFactor);
 
-            cmpAmountInput.value =
-                Math.min(converted, 999999999.99);
+            cmpAmountInput.value = (currentCurrency === 'PKR')
+                ? Math.round(converted)
+                : converted.toFixed(2);
 
             cmpAmountInput._lastValid =
                 cmpAmountInput.value;
