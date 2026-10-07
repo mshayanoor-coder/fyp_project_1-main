@@ -20,7 +20,7 @@ function attachZeroFocusHandling(input) {
 }
 
 function attachInputRestrictions(input, fieldType) {
-    const maxVal = (fieldType === 'percentage') ? 100 : 999999999.99;
+    const maxVal = (fieldType === 'upwork-fee') ? 15 : ((fieldType === 'percentage') ? 100 : 999999999.99);
 
     input.min = "0";
     input.max = String(maxVal);
@@ -50,7 +50,7 @@ function attachInputRestrictions(input, fieldType) {
 
         const numVal = parseFloat(val);
 
-        if (!isNaN(numVal) && numVal > maxVal) {
+        if (!isNaN(numVal) && (numVal > maxVal || numVal < 0)) {
             input.value = input._lastValid !== undefined ? input._lastValid : '';
             return;
         }
@@ -69,8 +69,17 @@ function calculateComparison() {
     const fiverrLost = amount * 0.20;
     const fiverrNet = amount - fiverrLost;
 
-    // Upwork deduction: flat 10%
-    const upworkFee = amount * 0.10;
+    // Upwork deduction: editable percentage between 0% and 15% (defaults to 10%)
+    const upworkPctInput = document.getElementById('cmp-u-fee-pct');
+    let upworkVal = 10;
+    if (upworkPctInput && upworkPctInput.value !== '') {
+        const parsed = parseFloat(upworkPctInput.value);
+        if (!isNaN(parsed)) {
+            upworkVal = Math.min(15, Math.max(0, parsed));
+        }
+    }
+    const upworkRate = upworkVal / 100;
+    const upworkFee = amount * upworkRate;
     const upworkNet = amount - upworkFee;
 
     // Direct client: 0% deduction
@@ -137,6 +146,15 @@ document.addEventListener("DOMContentLoaded", () => {
         attachZeroFocusHandling(cmpAmountInput);
 
         cmpAmountInput.addEventListener('input', calculateComparison);
+    }
+
+    // Attach restrictions and listeners to the editable Upwork fee input (0% - 15%)
+    const upworkPctInput = document.getElementById('cmp-u-fee-pct');
+    if (upworkPctInput) {
+        attachInputRestrictions(upworkPctInput, 'upwork-fee');
+        upworkPctInput._lastValid = upworkPctInput.value;
+        attachZeroFocusHandling(upworkPctInput);
+        upworkPctInput.addEventListener('input', calculateComparison);
     }
 
     calculateComparison();
